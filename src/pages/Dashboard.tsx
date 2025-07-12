@@ -7,7 +7,7 @@ import CustomerList from '../components/CustomerList'
 import NotificationCenter from '../components/NotificationCenter'
 
 export default function Dashboard() {
-  const { user, userProfile, profileError, signOut, refreshProfile } = useAuth()
+  const { user, userProfile, profileError, signOut, refreshProfile, createProfile } = useAuth()
   const { getMyTasks, getTasksAssignedByMe, getTasksByStatus } = useTasks()
   const [activeTab, setActiveTab] = useState<'dashboard' | 'tasks' | 'customers'>('dashboard')
   const [showTaskForm, setShowTaskForm] = useState(false)
@@ -28,6 +28,12 @@ export default function Dashboard() {
             </h1>
             <div className="flex items-center space-x-4">
               <NotificationCenter />
+              {profileError && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-2">
+                  <p className="text-xs text-red-700 mb-1">プロフィール読み込みエラー:</p>
+                  <p className="text-xs text-red-600">{profileError}</p>
+                </div>
+              )}
               <div className="flex items-center space-x-2">
                 {profileError ? (
                   <div className="flex items-center space-x-2">
@@ -40,6 +46,13 @@ export default function Dashboard() {
                       title={profileError}
                     >
                       再試行
+                    </button>
+                    <button
+                      onClick={createProfile}
+                      className="text-xs text-green-600 hover:text-green-800 border border-green-300 px-2 py-1 rounded"
+                      title="プロフィールを新規作成します"
+                    >
+                      作成
                     </button>
                   </div>
                 ) : userProfile ? (
