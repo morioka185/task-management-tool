@@ -84,13 +84,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const createUserProfile = async (userId: string): Promise<boolean> => {
     try {
+      console.log('Starting createUserProfile for userId:', userId)
+      
       // 現在の認証ユーザー情報を取得
-      const { data: { user: authUser } } = await supabase.auth.getUser()
+      const { data: { user: authUser }, error: userError } = await supabase.auth.getUser()
+      
+      if (userError) {
+        console.error('Error getting authenticated user:', userError)
+        setProfileError(`認証ユーザー取得エラー: ${userError.message}`)
+        return false
+      }
       
       if (!authUser) {
         console.error('No authenticated user found')
+        setProfileError('認証されたユーザーが見つかりません')
         return false
       }
+
+      console.log('Authenticated user:', { id: authUser.id, email: authUser.email })
 
       // メールアドレスから役職を推定
       let role: 'admin' | 'manager' | 'sales' = 'sales'
@@ -107,21 +118,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name = '営業担当'
       }
 
-      // ユーザープロフィールを作成
-      const { data, error } = await supabase
-        .from('users')
-        .insert({
-          id: userId,
-          email: authUser.email || '',
-          name: name,
-          role: role,
-          manager_id: null
+      const profileData = {
+        id: userId,
+        email: authUser.email || '',
+        name: name,
+        role: role,
+        manager_id: null
+      }
+
+      console.log('Creating user profile with data:', profileData)
+
+      // 最初にPostgreSQL関数を使った作成を試行
+      let data, error
+
+      try {
+        console.log('Trying RPC function create_user_profile...')
+        const rpcResult = await supabase.rpc('create_user_profile', {
+          user_id: userId,
+          user_email: authUser.email || '',
+          user_name: name,
+          user_role: role
         })
-        .select()
-        .single()
+        
+        if (rpcResult.error) {
+          console.log('RPC function failed, trying direct upsert...', rpcResult.error)
+          
+          // RPC関数が失敗した場合は直接upsertを試行
+          const upsertResult = await supabase
+            .from('users')
+            .upsert(profileData, { onConflict: 'id' })
+            .select()
+            .single()
+          
+          data = upsertResult.data
+          error = upsertResult.error
+        } else {
+          console.log('RPC function succeeded')
+          // RPC関数が成功した場合、作成されたユーザーを取得
+          const fetchResult = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single()
+          
+          data = fetchResult.data
+          error = fetchResult.error
+        }
+      } catch (rpcError) {
+        console.log('RPC function not available, using direct upsert...', rpcError)
+        
+        // RPC関数が存在しない場合は直接upsertを使用
+        const upsertResult = await supabase
+          .from('users')
+          .upsert(profileData, { onConflict: 'id' })
+          .select()
+          .single()
+        
+        data = upsertResult.data
+        error = upsertResult.error
+      }
 
       if (error) {
-        console.error('Error creating user profile:', error)
+        console.error('Profile creation failed:', error)
+        console.error('Error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        })
+        setProfileError(`プロフィール作成エラー: ${error.message} (コード: ${error.code})`)
         return false
       }
 
@@ -130,7 +195,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfileError(null)
       return true
     } catch (error) {
-      console.error('Error in createUserProfile:', error)
+      console.error('Unexpected error in createUserProfile:', error)
+      setProfileError(`予期しないエラー: ${error instanceof Error ? error.message : String(error)}`)
       return false
     }
   }
@@ -171,7 +237,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) {
       const success = await createUserProfile(user.id)
       if (!success) {
-        setProfileError('プロフィールの作成に失敗しました')
+        // 作成に失敗した場合は、認証情報をベースにした最小限のプロフィールを設定
+        console.log('Creating fallback profile from auth data...')
+        const fallbackProfile: UserProfile = {
+          id: user.id,
+          email: user.email || '',
+          name: user.email?.split('@')[0] || 'ユーザー',
+          role: 'sales',
+          manager_id: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+        
+        setUserProfile(fallbackProfile)
+        setProfileError('データベースへの保存は失敗しましたが、一時的なプロフィールを作成しました')
       }
     }
   }
