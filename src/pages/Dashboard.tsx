@@ -7,7 +7,7 @@ import CustomerList from '../components/CustomerList'
 import NotificationCenter from '../components/NotificationCenter'
 
 export default function Dashboard() {
-  const { userProfile, signOut, refreshProfile } = useAuth()
+  const { user, userProfile, profileError, signOut, refreshProfile } = useAuth()
   const { getMyTasks, getTasksAssignedByMe, getTasksByStatus } = useTasks()
   const [activeTab, setActiveTab] = useState<'dashboard' | 'tasks' | 'customers'>('dashboard')
   const [showTaskForm, setShowTaskForm] = useState(false)
@@ -29,16 +29,46 @@ export default function Dashboard() {
             <div className="flex items-center space-x-4">
               <NotificationCenter />
               <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-700">
-                  {userProfile?.name} ({userProfile?.role === 'admin' ? '管理者' : userProfile?.role === 'manager' ? 'マネージャー' : '営業'})
-                </span>
-                <button
-                  onClick={refreshProfile}
-                  className="text-xs text-blue-600 hover:text-blue-800 border border-blue-300 px-2 py-1 rounded"
-                  title="プロフィール更新"
-                >
-                  更新
-                </button>
+                {profileError ? (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-red-600">
+                      {user?.email || 'ユーザー'} (プロフィール読み込みエラー)
+                    </span>
+                    <button
+                      onClick={refreshProfile}
+                      className="text-xs text-red-600 hover:text-red-800 border border-red-300 px-2 py-1 rounded"
+                      title={profileError}
+                    >
+                      再試行
+                    </button>
+                  </div>
+                ) : userProfile ? (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-700">
+                      {userProfile.name} ({userProfile.role === 'admin' ? '管理者' : userProfile.role === 'manager' ? 'マネージャー' : '営業'})
+                    </span>
+                    <button
+                      onClick={refreshProfile}
+                      className="text-xs text-blue-600 hover:text-blue-800 border border-blue-300 px-2 py-1 rounded"
+                      title="プロフィール更新"
+                    >
+                      更新
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-500">
+                      {user?.email || 'ユーザー'} (読み込み中...)
+                    </span>
+                    <button
+                      onClick={refreshProfile}
+                      className="text-xs text-gray-600 hover:text-gray-800 border border-gray-300 px-2 py-1 rounded"
+                      title="プロフィール更新"
+                    >
+                      更新
+                    </button>
+                  </div>
+                )}
               </div>
               <button
                 onClick={signOut}

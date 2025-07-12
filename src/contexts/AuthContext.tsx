@@ -9,6 +9,7 @@ interface AuthContextType {
   user: User | null
   userProfile: UserProfile | null
   loading: boolean
+  profileError: string | null
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string, name: string) => Promise<void>
   signOut: () => Promise<void>
@@ -21,6 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [profileError, setProfileError] = useState<string | null>(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -48,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserProfile = async (userId: string) => {
     try {
+      setProfileError(null)
       console.log('Fetching user profile for:', userId)
       const { data, error } = await supabase
         .from('users')
@@ -57,12 +60,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         console.error('Supabase error:', error)
+        setProfileError('ユーザープロフィールの取得に失敗しました')
         throw error
       }
       console.log('User profile fetched:', data)
       setUserProfile(data)
     } catch (error) {
       console.error('Error fetching user profile:', error)
+      setProfileError('ユーザー情報が見つかりません。管理者にお問い合わせください。')
     }
   }
 
@@ -102,6 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     userProfile,
     loading,
+    profileError,
     signIn,
     signUp,
     signOut,

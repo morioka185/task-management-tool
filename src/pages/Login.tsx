@@ -33,8 +33,8 @@ export default function Login() {
           await signIn(`${email}@test.com`, 'password123')
         } catch (error) {
           // Supabaseアカウントが存在しない場合のエラーハンドリング
-          console.log('Supabaseアカウントが存在しません。テストデータを作成してください。')
-          setError('テストアカウントが作成されていません。管理者にお問い合わせください。')
+          console.log('Supabaseアカウントが存在しません:', error)
+          setError(`テストアカウント ${email}@test.com が見つかりません。データベースにユーザーが登録されていない可能性があります。`)
         }
         return
       }
