@@ -5,7 +5,7 @@ interface AuthenticatedImageProps {
   src: string
   alt: string
   className?: string
-  onClick?: () => void
+  onClick?: (e: React.MouseEvent<HTMLImageElement>) => void
 }
 
 export default function AuthenticatedImage({ src, alt, className, onClick }: AuthenticatedImageProps) {
