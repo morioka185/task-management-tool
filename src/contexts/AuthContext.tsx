@@ -62,6 +62,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         console.error('Supabase error:', error)
         
+        // 500エラー（内部サーバーエラー）の場合
+        if (error.code === '500' || error.status === 500) {
+          console.log('Database internal error detected, trying emergency fallback...')
+          setProfileError('データベース内部エラーです。RLSポリシーまたはデータベース構造を確認してください。')
+          
+          // 緊急時フォールバックプロフィールを作成
+          const { data: { user: authUser } } = await supabase.auth.getUser()
+          if (authUser) {
+            const emergencyProfile: UserProfile = {
+              id: userId,
+              email: authUser.email || '',
+              name: authUser.email?.split('@')[0] || 'ユーザー',
+              role: 'sales',
+              manager_id: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }
+            setUserProfile(emergencyProfile)
+            console.log('Emergency profile created:', emergencyProfile)
+          }
+          return
+        }
+        
         // ユーザーが見つからない場合は自動作成を試行
         if (error.code === 'PGRST116') {
           console.log('User not found in database, attempting to create...')
