@@ -62,10 +62,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         console.error('Supabase error:', error)
         
-        // 500エラー（内部サーバーエラー）の場合
-        if (error.code === '500' || error.status === 500) {
-          console.log('Database internal error detected, trying emergency fallback...')
-          setProfileError('データベース内部エラーです。RLSポリシーまたはデータベース構造を確認してください。')
+        // 500エラー（内部サーバーエラー）または無限再帰エラーの場合
+        if (error.code === '500' || error.code === '42P17') {
+          console.log('Database critical error detected:', error.code, error.message)
+          
+          if (error.code === '42P17') {
+            setProfileError('RLS無限再帰エラーです。database-critical-fix.sqlを実行してください。')
+          } else {
+            setProfileError('データベース内部エラーです。RLSポリシーまたはデータベース構造を確認してください。')
+          }
           
           // 緊急時フォールバックプロフィールを作成
           const { data: { user: authUser } } = await supabase.auth.getUser()
@@ -80,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               updated_at: new Date().toISOString()
             }
             setUserProfile(emergencyProfile)
-            console.log('Emergency profile created:', emergencyProfile)
+            console.log('Emergency profile created for error:', error.code, emergencyProfile)
           }
           return
         }
