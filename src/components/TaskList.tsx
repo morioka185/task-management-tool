@@ -3,6 +3,7 @@ import { useTasks } from '../hooks/useTasks'
 import { useAuth } from '../contexts/AuthContext'
 import { extractImagesFromDescription } from '../utils/attachments'
 import ImageGallery from './ImageGallery'
+import TaskModal from './TaskModal'
 
 const statusLabels = {
   pending: '未着手',
@@ -26,9 +27,11 @@ interface TaskListProps {
 }
 
 export default function TaskList({ filter = 'all', onTaskClick }: TaskListProps) {
-  const { tasks, loading, error, updateTask } = useTasks()
+  const { tasks, loading, error, updateTask, revertTaskStatus, canRevertTaskStatus } = useTasks()
   const { userProfile } = useAuth()
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null)
+  const [selectedTask, setSelectedTask] = useState<any>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   const getFilteredTasks = () => {
     if (!userProfile) return []
@@ -52,6 +55,31 @@ export default function TaskList({ filter = 'all', onTaskClick }: TaskListProps)
     } finally {
       setUpdatingTaskId(null)
     }
+  }
+
+  const handleRevertStatus = async (taskId: string) => {
+    setUpdatingTaskId(taskId)
+    try {
+      await revertTaskStatus(taskId)
+    } catch (error) {
+      console.error('ステータス復元エラー:', error)
+    } finally {
+      setUpdatingTaskId(null)
+    }
+  }
+
+  const handleTaskClick = (task: any) => {
+    if (onTaskClick) {
+      onTaskClick(task)
+    } else {
+      setSelectedTask(task)
+      setIsModalOpen(true)
+    }
+  }
+
+  const closeModal = () => {
+    setIsModalOpen(false)
+    setSelectedTask(null)
   }
 
   const getAvailableStatuses = (currentStatus: string, task: any) => {
@@ -119,7 +147,10 @@ export default function TaskList({ filter = 'all', onTaskClick }: TaskListProps)
           return (
             <li key={task.id} className="px-6 py-4 hover:bg-gray-50">
               <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
+                <div 
+                  className="flex-1 min-w-0 cursor-pointer"
+                  onClick={() => handleTaskClick(task)}
+                >
                   <div className="flex items-center space-x-3">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[task.status]}`}>
                       {statusLabels[task.status]}
@@ -170,7 +201,10 @@ export default function TaskList({ filter = 'all', onTaskClick }: TaskListProps)
                 {getAvailableStatuses(task.status, task).length > 0 && (
                   <select
                     value={task.status}
-                    onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                    onChange={(e) => {
+                      e.stopPropagation()
+                      handleStatusChange(task.id, e.target.value)
+                    }}
                     disabled={updatingTaskId === task.id}
                     className="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   >
@@ -185,12 +219,16 @@ export default function TaskList({ filter = 'all', onTaskClick }: TaskListProps)
                   </select>
                 )}
 
-                {onTaskClick && (
+                {canRevertTaskStatus(task.id) && (
                   <button
-                    onClick={() => onTaskClick(task)}
-                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleRevertStatus(task.id)
+                    }}
+                    disabled={updatingTaskId === task.id}
+                    className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded-md border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   >
-                    詳細
+                    元に戻す
                   </button>
                 )}
               </div>
@@ -199,6 +237,15 @@ export default function TaskList({ filter = 'all', onTaskClick }: TaskListProps)
           )
         })}
       </ul>
+      
+      {/* タスクモーダル */}
+      {selectedTask && (
+        <TaskModal
+          task={selectedTask}
+          isOpen={isModalOpen}
+          onClose={closeModal}
+        />
+      )}
     </div>
   )
 }

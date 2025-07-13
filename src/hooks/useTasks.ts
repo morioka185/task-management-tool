@@ -13,10 +13,18 @@ type Task = Database['public']['Tables']['tasks']['Row'] & {
 type TaskInsert = Database['public']['Tables']['tasks']['Insert']
 type TaskUpdate = Database['public']['Tables']['tasks']['Update']
 
+type TaskStatusHistory = {
+  taskId: string
+  previousStatus: string
+  newStatus: string
+  timestamp: Date
+}
+
 export function useTasks() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [statusHistory, setStatusHistory] = useState<TaskStatusHistory[]>([])
   const { userProfile } = useAuth()
 
   const fetchTasks = async () => {
@@ -101,6 +109,16 @@ export function useTasks() {
       )
 
       if (originalTask && updates.status && originalTask.status !== updates.status) {
+        setStatusHistory(prev => [
+          ...prev,
+          {
+            taskId: id,
+            previousStatus: originalTask.status,
+            newStatus: updates.status as string,
+            timestamp: new Date()
+          }
+        ])
+
         switch (updates.status) {
           case 'completed':
             await notifyTaskCompleted(
@@ -130,6 +148,26 @@ export function useTasks() {
       return data
     } catch (error) {
       throw error instanceof Error ? error : new Error('エラーが発生しました')
+    }
+  }
+
+  const revertTaskStatus = async (taskId: string) => {
+    try {
+      const lastChange = statusHistory
+        .filter(h => h.taskId === taskId)
+        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0]
+      
+      if (!lastChange) {
+        throw new Error('変更履歴が見つかりません')
+      }
+
+      await updateTask(taskId, { status: lastChange.previousStatus as any })
+      
+      setStatusHistory(prev => 
+        prev.filter(h => !(h.taskId === taskId && h.timestamp === lastChange.timestamp))
+      )
+    } catch (error) {
+      throw error instanceof Error ? error : new Error('ステータスの復元に失敗しました')
     }
   }
 
@@ -178,6 +216,16 @@ export function useTasks() {
     fetchTasks()
   }, [])
 
+  const getTaskStatusHistory = (taskId: string) => {
+    return statusHistory
+      .filter(h => h.taskId === taskId)
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+  }
+
+  const canRevertTaskStatus = (taskId: string) => {
+    return statusHistory.some(h => h.taskId === taskId)
+  }
+
   return {
     tasks,
     loading,
@@ -185,10 +233,13 @@ export function useTasks() {
     createTask,
     updateTask,
     deleteTask,
+    revertTaskStatus,
     getTasksByStatus,
     getMyTasks,
     getTasksAssignedByMe,
     canManageTask,
+    getTaskStatusHistory,
+    canRevertTaskStatus,
     refetch: fetchTasks,
   }
 }
