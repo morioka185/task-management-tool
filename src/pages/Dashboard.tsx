@@ -60,6 +60,13 @@ export default function Dashboard() {
                     <span className="text-sm text-gray-700">
                       {userProfile.name} ({userProfile.role === 'admin' ? '管理者' : userProfile.role === 'manager' ? 'マネージャー' : '営業'})
                     </span>
+                    <a
+                      href="#/profile"
+                      className="text-xs text-blue-600 hover:text-blue-800 border border-blue-300 px-2 py-1 rounded"
+                      title="プロフィール編集"
+                    >
+                      プロフィール
+                    </a>
                     <button
                       onClick={refreshProfile}
                       className="text-xs text-blue-600 hover:text-blue-800 border border-blue-300 px-2 py-1 rounded"
